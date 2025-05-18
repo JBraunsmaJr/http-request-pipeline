@@ -22,7 +22,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import SchemaObjectSplitter from './SchemaObjectSplitter';
 
 const ApiNode = ({ id, data }: NodeProps<PipelineNode['data']>) => {
-  const { removeNode, setSelectedNode, nodes, promoteOutputToPipelineOutput } = usePipeline();
+  const { removeNode, setSelectedNode, nodes, promoteOutputToPipelineOutput, updateNode } = usePipeline();
   const { darkMode } = useTheme();
 
   // State for schema splitter modal
@@ -185,25 +185,86 @@ const ApiNode = ({ id, data }: NodeProps<PipelineNode['data']>) => {
                   left: -4
                 }}
               />
-              <TextField
-                size="small"
-                label={input.name}
-                fullWidth
-                variant="outlined"
-                placeholder={input.required ? 'Required' : 'Optional'}
-                value={input.value || ''}
-                onChange={(e) => {
-                  // This would be handled by the context
-                }}
-                sx={{ 
-                  '& .MuiOutlinedInput-root': {
-                    fontSize: '0.8rem',
-                  },
-                  '& .MuiInputLabel-root': {
-                    fontSize: '0.8rem',
-                  }
-                }}
-              />
+              <Box>
+                {input.type === 'array' ? (
+                  <Box>
+                    <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+                      {input.name} (Array)
+                    </Typography>
+                    <Box 
+                      sx={{ 
+                        border: '1px solid rgba(0, 0, 0, 0.23)', 
+                        borderRadius: 1, 
+                        p: 1,
+                        backgroundColor: 'rgba(0, 0, 0, 0.02)'
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ display: 'block', mb: 1, color: 'text.secondary' }}>
+                        Enter array items (one per line)
+                      </Typography>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        variant="outlined"
+                        placeholder={input.required ? 'Required' : 'Optional'}
+                        value={Array.isArray(input.value) ? input.value.join('\n') : (input.value || '')}
+                        onChange={(e) => {
+                          const newValue = e.target.value
+                            .split('\n')
+                            .map(item => item.trim())
+                            .filter(item => item !== '');
+
+                          const updatedInputs = data.inputs.map(inp => 
+                            inp.id === input.id 
+                              ? { ...inp, value: newValue } 
+                              : inp
+                          );
+
+                          updateNode(id, { inputs: updatedInputs });
+                        }}
+                        multiline
+                        rows={3}
+                        sx={{ 
+                          '& .MuiOutlinedInput-root': {
+                            fontSize: '0.8rem',
+                          }
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                ) : (
+                  <TextField
+                    size="small"
+                    label={input.name}
+                    fullWidth
+                    variant="outlined"
+                    placeholder={input.required ? 'Required' : 'Optional'}
+                    value={input.value || ''}
+                    onChange={(e) => {
+                      const updatedInputs = data.inputs.map(inp => 
+                        inp.id === input.id 
+                          ? { ...inp, value: e.target.value } 
+                          : inp
+                      );
+
+                      updateNode(id, { inputs: updatedInputs });
+                    }}
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        fontSize: '0.8rem',
+                      },
+                      '& .MuiInputLabel-root': {
+                        fontSize: '0.8rem',
+                      }
+                    }}
+                  />
+                )}
+                {input.location && (
+                  <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
+                    {input.location.charAt(0).toUpperCase() + input.location.slice(1)} parameter
+                  </Typography>
+                )}
+              </Box>
             </Box>
           ))}
         </Box>

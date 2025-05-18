@@ -134,7 +134,8 @@ export const PipelineProvider: React.FC<PipelineProviderProps> = ({ children }) 
             id: uuidv4(),
             name: param.name,
             type: param.schema?.type || 'string',
-            required: param.required || false
+            required: param.required || false,
+            location: param.in as 'path' | 'query' | 'header'
           });
         }
       });
@@ -144,13 +145,36 @@ export const PipelineProvider: React.FC<PipelineProviderProps> = ({ children }) 
       const content = endpoint.requestBody.content;
       if (content && content['application/json']) {
         const schema = content['application/json'].schema;
-        if (schema && 'properties' in schema) {
+
+        // Find the service to get the OpenAPI document for resolving $refs
+        const service = services.find(s => s.id === endpoint.serviceId);
+        const openApiDocument = service?.openApiDocument;
+
+        // If it's a reference and we have the OpenAPI document
+        if (schema && '$ref' in schema && openApiDocument) {
+          // Resolve the reference
+          const resolvedSchema = resolveSchemaRef(schema.$ref, openApiDocument);
+          if (resolvedSchema && resolvedSchema.properties) {
+            Object.entries(resolvedSchema.properties).forEach(([name, prop]) => {
+              newNode.data.inputs.push({
+                id: uuidv4(),
+                name,
+                type: (prop as any).type || 'string',
+                required: resolvedSchema.required?.includes(name) || false,
+                location: 'body'
+              });
+            });
+          }
+        }
+        // If it's an object with properties
+        else if (schema && 'properties' in schema) {
           Object.entries(schema.properties || {}).forEach(([name, prop]) => {
             newNode.data.inputs.push({
               id: uuidv4(),
               name,
               type: (prop as any).type || 'string',
-              required: schema.required?.includes(name) || false
+              required: schema.required?.includes(name) || false,
+              location: 'body'
             });
           });
         }

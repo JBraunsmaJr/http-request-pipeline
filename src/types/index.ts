@@ -34,6 +34,7 @@ export interface PipelineNode extends Node {
       value?: any;
       required: boolean;
       connected?: boolean;
+      location?: 'path' | 'query' | 'header' | 'body';
     }[];
     outputs: {
       statusCode: string;

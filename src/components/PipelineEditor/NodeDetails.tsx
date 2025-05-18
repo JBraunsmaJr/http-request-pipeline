@@ -48,15 +48,44 @@ const NodeDetails: React.FC<NodeDetailsProps> = ({ node }) => {
   };
 
   const handleEditInput = (inputId: string, currentValue: any) => {
+    // Find the input to edit
+    const input = inputs.find(input => input.id === inputId);
+
+    if (!input) return;
+
+    // Process the current value based on input type
+    let processedValue = currentValue || '';
+
+    // For array inputs, join array elements with newlines
+    if (input.type === 'array' && Array.isArray(currentValue)) {
+      processedValue = currentValue.join('\n');
+    }
+
     setEditingInput(inputId);
-    setInputValue(currentValue || '');
+    setInputValue(processedValue);
   };
 
   const handleSaveInput = (inputId: string) => {
+    // Find the input being edited
+    const input = inputs.find(input => input.id === inputId);
+
+    if (!input) return;
+
+    // Process the value based on input type
+    let processedValue = inputValue;
+
+    // For array inputs, split by newlines and filter out empty lines
+    if (input.type === 'array') {
+      processedValue = inputValue
+        .split('\n')
+        .map(item => item.trim())
+        .filter(item => item !== '');
+    }
+
     // Update the input value in the node
     const updatedInputs = inputs.map(input => 
       input.id === inputId 
-        ? { ...input, value: inputValue } 
+        ? { ...input, value: processedValue } 
         : input
     );
 
@@ -153,26 +182,67 @@ const NodeDetails: React.FC<NodeDetailsProps> = ({ node }) => {
                 }
               >
                 {editingInput === input.id ? (
-                  <TextField
-                    size="small"
-                    fullWidth
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    label={input.name}
-                    variant="outlined"
-                    autoFocus
-                  />
+                  input.type === 'array' ? (
+                    <Box>
+                      <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+                        {input.name} (Array)
+                      </Typography>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        variant="outlined"
+                        placeholder="Enter array items (one per line)"
+                        multiline
+                        rows={4}
+                        autoFocus
+                      />
+                    </Box>
+                  ) : (
+                    <TextField
+                      size="small"
+                      fullWidth
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      label={input.name}
+                      variant="outlined"
+                      autoFocus
+                    />
+                  )
                 ) : (
                   <ListItemText
                     primary={input.name}
                     secondary={
                       <>
-                        <Typography component="span" variant="body2" color="text.primary">
-                          {input.connected ? '(Connected to output)' : (input.value || '(Not set)')}
-                        </Typography>
+                        {input.connected ? (
+                          <Typography component="span" variant="body2" color="text.primary">
+                            (Connected to output)
+                          </Typography>
+                        ) : input.type === 'array' && Array.isArray(input.value) ? (
+                          <Box sx={{ border: '1px solid rgba(0, 0, 0, 0.12)', borderRadius: 1, p: 1, mt: 1, mb: 1 }}>
+                            <Typography component="span" variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                              Array items:
+                            </Typography>
+                            {input.value.length > 0 ? input.value.map((item, index) => (
+                              <Typography key={index} component="div" variant="body2" color="text.primary">
+                                {item}
+                              </Typography>
+                            )) : (
+                              <Typography component="div" variant="body2" color="text.secondary">
+                                (Empty array)
+                              </Typography>
+                            )}
+                          </Box>
+                        ) : (
+                          <Typography component="span" variant="body2" color="text.primary">
+                            {input.value || '(Not set)'}
+                          </Typography>
+                        )}
                         <br />
                         <Typography component="span" variant="caption">
                           Type: {input.type} | {input.required ? 'Required' : 'Optional'}
+                          {input.location && ` | ${input.location.charAt(0).toUpperCase() + input.location.slice(1)} parameter`}
                         </Typography>
                       </>
                     }
