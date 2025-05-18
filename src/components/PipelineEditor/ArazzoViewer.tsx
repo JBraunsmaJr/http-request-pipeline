@@ -20,34 +20,55 @@ interface ArazzoViewerProps {
 }
 
 // Arazzo specification types
-interface ArazzoWorkflow {
-  id: string;
-  name: string;
+interface ArazzoDocument {
+  arazzo: string;
+  info: {
+    title: string;
+    description?: string;
+    version?: string;
+    termsOfService?: string;
+    contact?: {
+      name?: string;
+      url?: string;
+      email?: string;
+    };
+    license?: {
+      name: string;
+      url?: string;
+    };
+  };
+  workflow: {
+    id?: string;
+    inputs?: Record<string, ArazzoParameter>;
+    outputs?: Record<string, ArazzoParameter>;
+    steps: Record<string, ArazzoStep>;
+  };
+}
+
+interface ArazzoParameter {
   description?: string;
-  steps: ArazzoStep[];
-  inputs?: ArazzoIO[];
-  outputs?: ArazzoIO[];
+  schema: {
+    type: string;
+    format?: string;
+    items?: any;
+    properties?: Record<string, any>;
+    required?: string[];
+  };
+  required?: boolean;
 }
 
 interface ArazzoStep {
-  id: string;
-  name: string;
-  type: string;
-  operation?: {
-    method: string;
-    path: string;
-  };
-  inputs?: ArazzoIO[];
-  outputs?: ArazzoIO[];
-  next?: string[];
-}
-
-interface ArazzoIO {
-  id: string;
-  name: string;
-  type: string;
+  type: 'operation' | 'workflow' | 'branch' | 'parallel' | 'foreach' | 'wait';
+  name?: string;
   description?: string;
-  value?: any;
+  operation?: {
+    method: 'get' | 'put' | 'post' | 'delete' | 'options' | 'head' | 'patch' | 'trace';
+    path: string;
+    server?: string;
+  };
+  inputs?: Record<string, string | object>;
+  outputs?: Record<string, ArazzoParameter>;
+  next?: string;
 }
 
 const ArazzoViewer: React.FC<ArazzoViewerProps> = ({ open, onClose }) => {
@@ -56,99 +77,125 @@ const ArazzoViewer: React.FC<ArazzoViewerProps> = ({ open, onClose }) => {
   const [tabValue, setTabValue] = useState(0);
 
   // Convert pipeline to Arazzo format
-  const convertToArazzo = (): ArazzoWorkflow => {
-    const arazzoSteps: ArazzoStep[] = [];
-    const stepConnections: Record<string, string[]> = {};
+  const convertToArazzo = (): ArazzoDocument => {
+    const arazzoSteps: Record<string, ArazzoStep> = {};
+    const stepConnections: Record<string, string> = {};
 
     // Process nodes
     nodes.forEach(node => {
       const { id, data, type } = node;
-      
+
+      // Determine step type based on node type
+      let stepType: ArazzoStep['type'] = 'operation';
+      if (type === 'inputNode') {
+        stepType = 'operation'; // Using operation as a fallback since 'input' is not a valid step type in Arazzo
+      } else if (type === 'outputNode') {
+        stepType = 'operation'; // Using operation as a fallback since 'output' is not a valid step type in Arazzo
+      }
+
       // Create step based on node type
       let step: ArazzoStep = {
-        id,
-        name: data.label,
-        type: type === 'apiNode' ? 'operation' : type === 'inputNode' ? 'input' : 'output',
-        inputs: [],
-        outputs: []
+        type: stepType,
+        name: data.label
       };
 
       // Add operation details for API nodes
       if (type === 'apiNode' && data.endpoint) {
         step.operation = {
-          method: data.endpoint.method,
+          method: data.endpoint.method as any, // Type assertion to handle potential method mismatch
           path: data.endpoint.path
         };
       }
 
-      // Add inputs
+      // Add inputs as a record
       if (data.inputs && data.inputs.length > 0) {
-        step.inputs = data.inputs.map(input => ({
-          id: input.id,
-          name: input.name,
-          type: input.type,
-          value: input.value
-        }));
+        step.inputs = {};
+        data.inputs.forEach(input => {
+          step.inputs![input.name] = input.value || input.name; // Use value if available, otherwise use name as reference
+        });
       }
 
-      // Add outputs
+      // Add outputs as a record
       if (data.outputs && data.outputs.length > 0) {
+        step.outputs = {};
         data.outputs.forEach(outputGroup => {
           outputGroup.items.forEach(output => {
-            step.outputs.push({
-              id: output.id,
-              name: output.name,
-              type: output.type
-            });
+            step.outputs![output.name] = {
+              schema: {
+                type: output.type
+              }
+            };
           });
         });
       }
 
-      arazzoSteps.push(step);
-      stepConnections[id] = [];
+      arazzoSteps[id] = step;
     });
 
     // Process edges to establish connections
     edges.forEach(edge => {
       const { source, target } = edge;
-      if (stepConnections[source]) {
-        stepConnections[source].push(target);
+      // In Arazzo, a step can only have one 'next' step
+      // We'll use the last connection for simplicity
+      stepConnections[source] = target;
+    });
+
+    // Add next step to each step
+    Object.keys(arazzoSteps).forEach(stepId => {
+      if (stepConnections[stepId]) {
+        arazzoSteps[stepId].next = stepConnections[stepId];
       }
     });
 
-    // Add next steps to each step
-    arazzoSteps.forEach(step => {
-      if (stepConnections[step.id] && stepConnections[step.id].length > 0) {
-        step.next = stepConnections[step.id];
-      }
-    });
+    // Create workflow inputs
+    const workflowInputs: Record<string, ArazzoParameter> = {};
+    if (pipeline.inputs && pipeline.inputs.length > 0) {
+      pipeline.inputs.forEach(input => {
+        workflowInputs[input.name] = {
+          description: input.description,
+          schema: {
+            type: input.type
+          },
+          required: false // Default to false as per schema
+        };
+      });
+    }
 
-    // Create the Arazzo workflow
-    const arazzoWorkflow: ArazzoWorkflow = {
-      id: pipeline.id,
-      name: pipeline.name,
-      description: pipeline.description,
-      steps: arazzoSteps,
-      inputs: pipeline.inputs?.map(input => ({
-        id: input.id,
-        name: input.name,
-        type: input.type,
-        description: input.description,
-        value: input.value
-      })),
-      outputs: pipeline.outputs?.map(output => ({
-        id: output.id,
-        name: output.name,
-        type: output.type,
-        description: output.description
-      }))
+    // Create workflow outputs
+    const workflowOutputs: Record<string, ArazzoParameter> = {};
+    if (pipeline.outputs && pipeline.outputs.length > 0) {
+      pipeline.outputs.forEach(output => {
+        workflowOutputs[output.name] = {
+          description: output.description,
+          schema: {
+            type: output.type
+          },
+          required: false // Default to false as per schema
+        };
+      });
+    }
+
+    // Create the Arazzo document
+    const arazzoDocument: ArazzoDocument = {
+      arazzo: "1.0.0", // Using the current version of the Arazzo specification
+      info: {
+        title: pipeline.name || "HTTP Request Pipeline",
+        description: pipeline.description,
+        version: "1.0.0" // Default version
+      },
+      workflow: {
+        id: pipeline.id,
+        steps: arazzoSteps,
+        inputs: Object.keys(workflowInputs).length > 0 ? workflowInputs : undefined,
+        outputs: Object.keys(workflowOutputs).length > 0 ? workflowOutputs : undefined
+      }
     };
 
-    return arazzoWorkflow;
+    return arazzoDocument;
   };
 
-  const arazzoWorkflow = convertToArazzo();
-  const arazzoJson = JSON.stringify(arazzoWorkflow, null, 2);
+  const arazzoDocument = convertToArazzo();
+  const arazzoJson = JSON.stringify(arazzoDocument, null, 2);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -163,7 +210,7 @@ const ArazzoViewer: React.FC<ArazzoViewerProps> = ({ open, onClose }) => {
       aria-labelledby="arazzo-viewer-dialog"
     >
       <DialogTitle id="arazzo-viewer-dialog">
-        Arazzo Pipeline Visualization
+        Arazzo Document Visualization
       </DialogTitle>
       <DialogContent dividers>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="arazzo viewer tabs">
@@ -188,68 +235,116 @@ const ArazzoViewer: React.FC<ArazzoViewerProps> = ({ open, onClose }) => {
           {tabValue === 1 && (
             <Box sx={{ p: 2, height: '60vh', overflow: 'auto' }}>
               <Typography variant="h6" gutterBottom>
-                {arazzoWorkflow.name}
+                {arazzoDocument.info.title}
               </Typography>
-              {arazzoWorkflow.description && (
+              {arazzoDocument.info.description && (
                 <Typography variant="body2" gutterBottom>
-                  {arazzoWorkflow.description}
+                  {arazzoDocument.info.description}
                 </Typography>
               )}
               <Box sx={{ mt: 2 }}>
                 <Typography variant="subtitle1" gutterBottom>
+                  Arazzo Version: {arazzoDocument.arazzo}
+                </Typography>
+
+                {/* Workflow Inputs */}
+                {arazzoDocument.workflow.inputs && Object.keys(arazzoDocument.workflow.inputs).length > 0 && (
+                  <Box sx={{ mt: 2, mb: 2 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Workflow Inputs:
+                    </Typography>
+                    <Paper sx={{ p: 2, mb: 2 }}>
+                      {Object.entries(arazzoDocument.workflow.inputs).map(([name, param]) => (
+                        <Typography key={name} variant="body2">
+                          {name}: {param.schema.type} {param.required ? '(Required)' : '(Optional)'}
+                          {param.description && ` - ${param.description}`}
+                        </Typography>
+                      ))}
+                    </Paper>
+                  </Box>
+                )}
+
+                {/* Workflow Outputs */}
+                {arazzoDocument.workflow.outputs && Object.keys(arazzoDocument.workflow.outputs).length > 0 && (
+                  <Box sx={{ mt: 2, mb: 2 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Workflow Outputs:
+                    </Typography>
+                    <Paper sx={{ p: 2, mb: 2 }}>
+                      {Object.entries(arazzoDocument.workflow.outputs).map(([name, param]) => (
+                        <Typography key={name} variant="body2">
+                          {name}: {param.schema.type}
+                          {param.description && ` - ${param.description}`}
+                        </Typography>
+                      ))}
+                    </Paper>
+                  </Box>
+                )}
+
+                {/* Steps */}
+                <Typography variant="subtitle1" gutterBottom>
                   Steps:
                 </Typography>
-                {arazzoWorkflow.steps.map(step => (
+                {Object.entries(arazzoDocument.workflow.steps).map(([stepId, step]) => (
                   <Paper 
-                    key={step.id} 
+                    key={stepId} 
                     sx={{ 
                       p: 2, 
                       mb: 2, 
                       border: '1px solid',
                       borderColor: step.type === 'operation' ? '#2196f3' : 
-                                  step.type === 'input' ? '#4caf50' : '#f44336',
+                                  step.type === 'workflow' ? '#4caf50' : 
+                                  step.type === 'branch' ? '#ff9800' : 
+                                  step.type === 'parallel' ? '#9c27b0' : 
+                                  step.type === 'foreach' ? '#00bcd4' : '#f44336',
                       borderRadius: 1
                     }}
                   >
                     <Typography variant="subtitle2">
-                      {step.name} ({step.type})
+                      {step.name || stepId} ({step.type})
                     </Typography>
+                    {step.description && (
+                      <Typography variant="body2" color="text.secondary">
+                        {step.description}
+                      </Typography>
+                    )}
                     {step.operation && (
                       <Typography variant="body2">
                         {step.operation.method.toUpperCase()} {step.operation.path}
+                        {step.operation.server && ` (Server: ${step.operation.server})`}
                       </Typography>
                     )}
-                    {step.inputs && step.inputs.length > 0 && (
+                    {step.inputs && Object.keys(step.inputs).length > 0 && (
                       <Box sx={{ mt: 1 }}>
                         <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
                           Inputs:
                         </Typography>
-                        {step.inputs.map(input => (
-                          <Typography key={input.id} variant="body2" sx={{ ml: 2 }}>
-                            {input.name}: {input.type}
+                        {Object.entries(step.inputs).map(([name, value]) => (
+                          <Typography key={name} variant="body2" sx={{ ml: 2 }}>
+                            {name}: {typeof value === 'string' ? value : JSON.stringify(value)}
                           </Typography>
                         ))}
                       </Box>
                     )}
-                    {step.outputs && step.outputs.length > 0 && (
+                    {step.outputs && Object.keys(step.outputs).length > 0 && (
                       <Box sx={{ mt: 1 }}>
                         <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
                           Outputs:
                         </Typography>
-                        {step.outputs.map(output => (
-                          <Typography key={output.id} variant="body2" sx={{ ml: 2 }}>
-                            {output.name}: {output.type}
+                        {Object.entries(step.outputs).map(([name, param]) => (
+                          <Typography key={name} variant="body2" sx={{ ml: 2 }}>
+                            {name}: {param.schema.type}
                           </Typography>
                         ))}
                       </Box>
                     )}
-                    {step.next && step.next.length > 0 && (
+                    {step.next && (
                       <Box sx={{ mt: 1 }}>
                         <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
-                          Next Steps:
+                          Next Step:
                         </Typography>
                         <Typography variant="body2" sx={{ ml: 2 }}>
-                          {step.next.join(', ')}
+                          {step.next}
                         </Typography>
                       </Box>
                     )}

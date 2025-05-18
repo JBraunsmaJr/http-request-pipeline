@@ -1,0 +1,491 @@
+﻿{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/OAI/Arazzo-Specification/main/schemas/v1.0/schema.json",
+  "title": "Arazzo Specification",
+  "description": "The Arazzo Specification defines a standard, language-agnostic interface to workflow definitions that can be used to describe, produce, consume, and visualize workflows.",
+  "type": "object",
+  "required": [
+    "arazzo",
+    "info",
+    "workflow"
+  ],
+  "properties": {
+    "arazzo": {
+      "type": "string",
+      "description": "The semantic version number of the Arazzo Specification that this document uses.",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "info": {
+      "type": "object",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The title of the workflow."
+        },
+        "description": {
+          "type": "string",
+          "description": "A short description of the workflow."
+        },
+        "version": {
+          "type": "string",
+          "description": "The version of the workflow document."
+        },
+        "termsOfService": {
+          "type": "string",
+          "description": "A URL to the Terms of Service for the workflow.",
+          "format": "uri"
+        },
+        "contact": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The identifying name of the contact person/organization."
+            },
+            "url": {
+              "type": "string",
+              "description": "The URL pointing to the contact information.",
+              "format": "uri"
+            },
+            "email": {
+              "type": "string",
+              "description": "The email address of the contact person/organization.",
+              "format": "email"
+            }
+          }
+        },
+        "license": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The license name used for the workflow."
+            },
+            "url": {
+              "type": "string",
+              "description": "A URL to the license used for the workflow.",
+              "format": "uri"
+            }
+          }
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "required": [
+        "steps"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "A unique identifier for the workflow."
+        },
+        "inputs": {
+          "type": "object",
+          "description": "The inputs for the workflow.",
+          "additionalProperties": {
+            "$ref": "#/definitions/Parameter"
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "description": "The outputs from the workflow.",
+          "additionalProperties": {
+            "$ref": "#/definitions/Parameter"
+          }
+        },
+        "steps": {
+          "type": "object",
+          "description": "The steps that make up the workflow.",
+          "additionalProperties": {
+            "$ref": "#/definitions/Step"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Parameter": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "A brief description of the parameter."
+        },
+        "schema": {
+          "description": "The schema defining the type used for the parameter.",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Schema"
+            },
+            {
+              "$ref": "#/definitions/Reference"
+            }
+          ]
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Determines whether this parameter is mandatory.",
+          "default": false
+        }
+      }
+    },
+    "Schema": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The type of the schema.",
+          "enum": [
+            "string",
+            "number",
+            "integer",
+            "boolean",
+            "array",
+            "object"
+          ]
+        },
+        "format": {
+          "type": "string",
+          "description": "The format of the schema."
+        },
+        "items": {
+          "description": "The items of the array.",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Schema"
+            },
+            {
+              "$ref": "#/definitions/Reference"
+            }
+          ]
+        },
+        "properties": {
+          "type": "object",
+          "description": "The properties of the object.",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "$ref": "#/definitions/Schema"
+              },
+              {
+                "$ref": "#/definitions/Reference"
+              }
+            ]
+          }
+        },
+        "required": {
+          "type": "array",
+          "description": "The required properties of the object.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Reference": {
+      "type": "object",
+      "required": [
+        "$ref"
+      ],
+      "properties": {
+        "$ref": {
+          "type": "string",
+          "description": "The reference string."
+        }
+      }
+    },
+    "Step": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The type of the step.",
+          "enum": [
+            "operation",
+            "workflow",
+            "branch",
+            "parallel",
+            "foreach",
+            "wait"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the step."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of the step."
+        },
+        "operation": {
+          "type": "object",
+          "description": "The operation to be performed.",
+          "required": [
+            "method",
+            "path"
+          ],
+          "properties": {
+            "method": {
+              "type": "string",
+              "description": "The HTTP method to be used.",
+              "enum": [
+                "get",
+                "put",
+                "post",
+                "delete",
+                "options",
+                "head",
+                "patch",
+                "trace"
+              ]
+            },
+            "path": {
+              "type": "string",
+              "description": "The path to the operation."
+            },
+            "server": {
+              "type": "string",
+              "description": "The server to use for the operation."
+            }
+          }
+        },
+        "workflow": {
+          "type": "object",
+          "description": "The workflow to be executed.",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the workflow to be executed."
+            }
+          }
+        },
+        "branch": {
+          "type": "object",
+          "description": "The branch to be executed.",
+          "required": [
+            "conditions"
+          ],
+          "properties": {
+            "conditions": {
+              "type": "array",
+              "description": "The conditions to be evaluated.",
+              "items": {
+                "type": "object",
+                "required": [
+                  "condition",
+                  "next"
+                ],
+                "properties": {
+                  "condition": {
+                    "type": "string",
+                    "description": "The condition to be evaluated."
+                  },
+                  "next": {
+                    "type": "string",
+                    "description": "The next step to be executed if the condition is true."
+                  }
+                }
+              }
+            },
+            "default": {
+              "type": "string",
+              "description": "The default step to be executed if no condition is true."
+            }
+          }
+        },
+        "parallel": {
+          "type": "object",
+          "description": "The parallel steps to be executed.",
+          "required": [
+            "branches"
+          ],
+          "properties": {
+            "branches": {
+              "type": "array",
+              "description": "The branches to be executed in parallel.",
+              "items": {
+                "type": "string",
+                "description": "The step to be executed."
+              }
+            }
+          }
+        },
+        "foreach": {
+          "type": "object",
+          "description": "The foreach loop to be executed.",
+          "required": [
+            "items",
+            "steps"
+          ],
+          "properties": {
+            "items": {
+              "type": "string",
+              "description": "The items to iterate over."
+            },
+            "steps": {
+              "type": "array",
+              "description": "The steps to be executed for each item.",
+              "items": {
+                "type": "string",
+                "description": "The step to be executed."
+              }
+            }
+          }
+        },
+        "wait": {
+          "type": "object",
+          "description": "The wait step to be executed.",
+          "required": [
+            "time"
+          ],
+          "properties": {
+            "time": {
+              "type": "string",
+              "description": "The time to wait.",
+              "pattern": "^P(?!$)(?:\\d+Y)?(?:\\d+M)?(?:\\d+D)?(?:T(?!$)(?:\\d+H)?(?:\\d+M)?(?:\\d+S)?)?$"
+            }
+          }
+        },
+        "inputs": {
+          "type": "object",
+          "description": "The inputs for the step.",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "A reference to a workflow input or a previous step output."
+              },
+              {
+                "type": "object",
+                "description": "A value to be used as input.",
+                "additionalProperties": true
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "description": "The outputs from the step.",
+          "additionalProperties": {
+            "$ref": "#/definitions/Parameter"
+          }
+        },
+        "next": {
+          "type": "string",
+          "description": "The next step to be executed."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "operation"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "operation"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "workflow"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "workflow"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "branch"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "branch"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "parallel"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "parallel"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "foreach"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "foreach"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "wait"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "wait"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
