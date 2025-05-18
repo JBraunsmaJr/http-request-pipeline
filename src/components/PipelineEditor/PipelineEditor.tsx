@@ -26,11 +26,16 @@ import { Save as SaveIcon, Refresh as LoadIcon } from '@mui/icons-material';
 import { usePipeline } from '../../contexts/PipelineContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import ApiNode from './ApiNode';
+import InputNode from './InputNode';
+import OutputNode from './OutputNode';
 import NodeDetails from './NodeDetails';
+import PipelineIO from './PipelineIO';
 
 // Define node types
 const nodeTypes = {
-  apiNode: ApiNode
+  apiNode: ApiNode,
+  inputNode: InputNode,
+  outputNode: OutputNode
 };
 
 const PipelineEditor: React.FC = () => {
@@ -44,7 +49,9 @@ const PipelineEditor: React.FC = () => {
     setSelectedNode,
     savePipeline,
     loadPipeline,
-    pipeline
+    pipeline,
+    addInputNode,
+    addOutputNode
   } = usePipeline();
   const { darkMode } = useTheme();
 
@@ -73,6 +80,33 @@ const PipelineEditor: React.FC = () => {
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
   }, [setSelectedNode]);
+
+  // Handle drop event for pipeline inputs/outputs
+  const onDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+
+    const reactFlowBounds = event.currentTarget.getBoundingClientRect();
+    const type = event.dataTransfer.getData('application/reactflow/type');
+    const id = event.dataTransfer.getData('application/reactflow/id');
+
+    // Get the position where the element was dropped
+    const position = {
+      x: event.clientX - reactFlowBounds.left,
+      y: event.clientY - reactFlowBounds.top
+    };
+
+    if (type === 'pipelineInput') {
+      addInputNode(id, position);
+    } else if (type === 'pipelineOutput') {
+      addOutputNode(id, position);
+    }
+  }, [addInputNode, addOutputNode]);
+
+  // Handle drag over event
+  const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
 
   // Handle save dialog open
   const handleOpenSaveDialog = () => {
@@ -136,6 +170,8 @@ const PipelineEditor: React.FC = () => {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onPaneClick={onPaneClick}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
             nodeTypes={nodeTypes}
             connectionLineType={ConnectionLineType.Bezier}
             defaultViewport={{ x: 0, y: 0, zoom: 1 }}
@@ -195,21 +231,28 @@ const PipelineEditor: React.FC = () => {
         </ReactFlowProvider>
       </Box>
 
-      {/* Node Details Panel */}
-      {selectedNode && (
-        <Paper 
-          sx={{ 
-            width: 300, 
-            height: '100%', 
-            overflow: 'auto',
-            borderLeft: '1px solid',
-            borderColor: darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
-            backgroundColor: darkMode ? '#1e1e1e' : '#fff'
-          }}
-        >
+      {/* Node Details Panel or Pipeline IO Panel */}
+      <Paper 
+        sx={{ 
+          width: 300, 
+          height: '100%', 
+          overflow: 'auto',
+          borderLeft: '1px solid',
+          borderColor: darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
+          backgroundColor: darkMode ? '#1e1e1e' : '#fff',
+          display: 'block'
+        }}
+      >
+        {selectedNode ? (
           <NodeDetails node={selectedNode} />
-        </Paper>
-      )}
+        ) : (
+          <Box sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>Pipeline Configuration</Typography>
+            <PipelineIO type="inputs" />
+            <PipelineIO type="outputs" />
+          </Box>
+        )}
+      </Paper>
 
       {/* Save Dialog */}
       <Dialog open={saveDialogOpen} onClose={handleCloseSaveDialog}>

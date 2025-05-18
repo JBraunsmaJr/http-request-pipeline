@@ -6,7 +6,8 @@ import type {
   Pipeline,
   PipelineNode,
   PipelineEdge,
-  ApiEndpoint
+  ApiEndpoint,
+  PipelineIO
 } from '../types';
 import { resolveSchemaRef } from '../utils/openApiUtils';
 
@@ -17,7 +18,9 @@ const defaultPipeline: Pipeline = {
   description: '',
   nodes: [],
   edges: [],
-  globalVariables: {}
+  globalVariables: {},
+  inputs: [],
+  outputs: []
 };
 
 // Create context
@@ -45,6 +48,15 @@ interface PipelineContextType {
   removeGlobalVariable: (key: string) => void;
   savePipeline: (name?: string) => Pipeline;
   loadPipeline: () => Pipeline | null;
+  addPipelineInput: (input: Omit<PipelineIO, 'id'>) => void;
+  updatePipelineInput: (inputId: string, data: Partial<PipelineIO>) => void;
+  removePipelineInput: (inputId: string) => void;
+  addPipelineOutput: (output: Omit<PipelineIO, 'id'>) => void;
+  updatePipelineOutput: (outputId: string, data: Partial<PipelineIO>) => void;
+  removePipelineOutput: (outputId: string) => void;
+  addInputNode: (pipelineInputId: string, position: { x: number, y: number }) => void;
+  addOutputNode: (pipelineOutputId: string, position: { x: number, y: number }) => void;
+  promoteOutputToPipelineOutput: (nodeId: string, outputId: string, name: string) => void;
 }
 
 const PipelineContext = createContext<PipelineContextType | undefined>(undefined);
@@ -403,6 +415,70 @@ export const PipelineProvider: React.FC<PipelineProviderProps> = ({ children }) 
     });
   };
 
+  // Pipeline inputs management
+  const addPipelineInput = (input: Omit<PipelineIO, 'id'>) => {
+    setPipeline(prev => ({
+      ...prev,
+      inputs: [
+        ...(prev.inputs || []),
+        {
+          ...input,
+          id: uuidv4()
+        }
+      ]
+    }));
+  };
+
+  const updatePipelineInput = (inputId: string, data: Partial<PipelineIO>) => {
+    setPipeline(prev => ({
+      ...prev,
+      inputs: (prev.inputs || []).map(input => 
+        input.id === inputId 
+          ? { ...input, ...data } 
+          : input
+      )
+    }));
+  };
+
+  const removePipelineInput = (inputId: string) => {
+    setPipeline(prev => ({
+      ...prev,
+      inputs: (prev.inputs || []).filter(input => input.id !== inputId)
+    }));
+  };
+
+  // Pipeline outputs management
+  const addPipelineOutput = (output: Omit<PipelineIO, 'id'>) => {
+    setPipeline(prev => ({
+      ...prev,
+      outputs: [
+        ...(prev.outputs || []),
+        {
+          ...output,
+          id: uuidv4()
+        }
+      ]
+    }));
+  };
+
+  const updatePipelineOutput = (outputId: string, data: Partial<PipelineIO>) => {
+    setPipeline(prev => ({
+      ...prev,
+      outputs: (prev.outputs || []).map(output => 
+        output.id === outputId 
+          ? { ...output, ...data } 
+          : output
+      )
+    }));
+  };
+
+  const removePipelineOutput = (outputId: string) => {
+    setPipeline(prev => ({
+      ...prev,
+      outputs: (prev.outputs || []).filter(output => output.id !== outputId)
+    }));
+  };
+
   // Update pipeline when nodes or edges change
   React.useEffect(() => {
     setPipeline(prev => ({
@@ -446,6 +522,112 @@ export const PipelineProvider: React.FC<PipelineProviderProps> = ({ children }) 
     return null;
   };
 
+  // Add input node to the graph
+  const addInputNode = (pipelineInputId: string, position: { x: number, y: number }) => {
+    // Find the pipeline input
+    const pipelineInput = pipeline.inputs?.find(input => input.id === pipelineInputId);
+
+    if (!pipelineInput) {
+      console.error(`Pipeline input with id ${pipelineInputId} not found`);
+      return;
+    }
+
+    // Create a new node
+    const newNode: PipelineNode = {
+      id: uuidv4(),
+      type: 'inputNode',
+      position,
+      data: {
+        label: pipelineInput.name,
+        pipelineInputId: pipelineInput.id,
+        pipelineInputType: pipelineInput.type,
+        inputs: [],
+        outputs: [{
+          statusCode: '200',
+          items: [{
+            id: 'output',
+            name: pipelineInput.name,
+            type: pipelineInput.type
+          }]
+        }]
+      }
+    };
+
+    setNodes(prev => [...prev, newNode]);
+  };
+
+  // Add output node to the graph
+  const addOutputNode = (pipelineOutputId: string, position: { x: number, y: number }) => {
+    // Find the pipeline output
+    const pipelineOutput = pipeline.outputs?.find(output => output.id === pipelineOutputId);
+
+    if (!pipelineOutput) {
+      console.error(`Pipeline output with id ${pipelineOutputId} not found`);
+      return;
+    }
+
+    // Create a new node
+    const newNode: PipelineNode = {
+      id: uuidv4(),
+      type: 'outputNode',
+      position,
+      data: {
+        label: pipelineOutput.name,
+        pipelineOutputId: pipelineOutput.id,
+        pipelineOutputType: pipelineOutput.type,
+        inputs: [{
+          id: 'input',
+          name: pipelineOutput.name,
+          type: pipelineOutput.type,
+          required: true
+        }],
+        outputs: []
+      }
+    };
+
+    setNodes(prev => [...prev, newNode]);
+  };
+
+  // Promote a node output to a pipeline output
+  const promoteOutputToPipelineOutput = (nodeId: string, outputId: string, name: string) => {
+    // Find the node
+    const node = nodes.find(n => n.id === nodeId);
+
+    if (!node) {
+      console.error(`Node with id ${nodeId} not found`);
+      return;
+    }
+
+    // Find the output
+    let outputType = '';
+    let outputFound = false;
+
+    for (const outputGroup of node.data.outputs) {
+      for (const item of outputGroup.items) {
+        if (item.id === outputId) {
+          outputType = item.type;
+          outputFound = true;
+          break;
+        }
+      }
+      if (outputFound) break;
+    }
+
+    if (!outputFound) {
+      console.error(`Output with id ${outputId} not found in node ${nodeId}`);
+      return;
+    }
+
+    // Add a new pipeline output
+    const newOutput: Omit<PipelineIO, 'id'> = {
+      name,
+      type: outputType,
+      description: `Promoted from ${node.data.label}`
+    };
+
+    addPipelineOutput(newOutput);
+  };
+
   const value = {
     services,
     addService,
@@ -469,7 +651,16 @@ export const PipelineProvider: React.FC<PipelineProviderProps> = ({ children }) 
     setGlobalVariable,
     removeGlobalVariable,
     savePipeline,
-    loadPipeline
+    loadPipeline,
+    addPipelineInput,
+    updatePipelineInput,
+    removePipelineInput,
+    addPipelineOutput,
+    updatePipelineOutput,
+    removePipelineOutput,
+    addInputNode,
+    addOutputNode,
+    promoteOutputToPipelineOutput
   };
 
   return (

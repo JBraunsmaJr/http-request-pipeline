@@ -1,19 +1,20 @@
 ﻿import React, { memo, useState } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
-import { 
-  Box, 
-  Typography, 
-  Paper, 
-  Chip, 
-  Divider, 
-  TextField,
-  IconButton,
-  Tooltip,
-  Modal
+import {
+    Box,
+    Typography,
+    Paper,
+    Chip,
+    Divider,
+    TextField,
+    IconButton,
+    Tooltip,
+    Modal, Button
 } from '@mui/material';
 import { 
   Delete as DeleteIcon,
-  CallSplit as SplitIcon
+  CallSplit as SplitIcon,
+  Output as OutputIcon
 } from '@mui/icons-material';
 import type { PipelineNode } from '../../types';
 import {usePipeline} from '../../contexts/PipelineContext';
@@ -21,12 +22,17 @@ import { useTheme } from '../../contexts/ThemeContext';
 import SchemaObjectSplitter from './SchemaObjectSplitter';
 
 const ApiNode = ({ id, data }: NodeProps<PipelineNode['data']>) => {
-  const { removeNode, setSelectedNode, nodes } = usePipeline();
+  const { removeNode, setSelectedNode, nodes, promoteOutputToPipelineOutput } = usePipeline();
   const { darkMode } = useTheme();
 
   // State for schema splitter modal
   const [splitterOpen, setSplitterOpen] = useState(false);
   const [selectedOutput, setSelectedOutput] = useState<{ groupIndex: number; itemIndex: number } | null>(null);
+
+  // State for promote output modal
+  const [promoteOpen, setPromoteOpen] = useState(false);
+  const [outputToPromote, setOutputToPromote] = useState<{ groupIndex: number; itemIndex: number } | null>(null);
+  const [promotedOutputName, setPromotedOutputName] = useState('');
 
   const node = nodes.find(n => n.id === id) as PipelineNode;
 
@@ -50,6 +56,31 @@ const ApiNode = ({ id, data }: NodeProps<PipelineNode['data']>) => {
   const handleCloseSplitter = () => {
     setSplitterOpen(false);
     setSelectedOutput(null);
+  };
+
+  // Handler for opening the promote output modal
+  const handleOpenPromote = (groupIndex: number, itemIndex: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const output = data.outputs[groupIndex].items[itemIndex];
+    setOutputToPromote({ groupIndex, itemIndex });
+    setPromotedOutputName(output.name);
+    setPromoteOpen(true);
+  };
+
+  // Handler for closing the promote output modal
+  const handleClosePromote = () => {
+    setPromoteOpen(false);
+    setOutputToPromote(null);
+    setPromotedOutputName('');
+  };
+
+  // Handler for promoting an output to a pipeline output
+  const handlePromoteOutput = () => {
+    if (outputToPromote) {
+      const output = data.outputs[outputToPromote.groupIndex].items[outputToPromote.itemIndex];
+      promoteOutputToPipelineOutput(id, output.id, promotedOutputName);
+      handleClosePromote();
+    }
   };
 
   // Get method color
@@ -190,7 +221,7 @@ const ApiNode = ({ id, data }: NodeProps<PipelineNode['data']>) => {
             Outputs
           </Typography>
 
-          {data.outputs.map((outputGroup) => (
+          {data.outputs.map((outputGroup, outputGroupIndex) => (
             <Box key={outputGroup.statusCode} sx={{ mb: 2 }}>
               <Typography 
                 variant="caption" 
@@ -227,6 +258,15 @@ const ApiNode = ({ id, data }: NodeProps<PipelineNode['data']>) => {
                           </IconButton>
                         </Tooltip>
                       )}
+                      <Tooltip title="Promote to pipeline output">
+                        <IconButton 
+                          size="small" 
+                          onClick={(e) => handleOpenPromote(outputGroupIndex, outputItemIndex, e)}
+                          sx={{ ml: 1, p: 0.5 }}
+                        >
+                          <OutputIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </Typography>
                   </Box>
                   <Handle
@@ -270,6 +310,46 @@ const ApiNode = ({ id, data }: NodeProps<PipelineNode['data']>) => {
             />
           )}
         </div>
+      </Modal>
+
+      {/* Promote Output Modal */}
+      <Modal
+        open={promoteOpen}
+        onClose={handleClosePromote}
+        aria-labelledby="promote-output-modal"
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        <Paper sx={{ p: 2, maxWidth: 400 }}>
+          <Typography variant="h6" gutterBottom>
+            Promote to Pipeline Output
+          </Typography>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Output Name"
+            fullWidth
+            value={promotedOutputName}
+            onChange={(e) => setPromotedOutputName(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button onClick={handleClosePromote} sx={{ mr: 1 }}>
+              Cancel
+            </Button>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={handlePromoteOutput}
+              disabled={!promotedOutputName}
+            >
+              Promote
+            </Button>
+          </Box>
+        </Paper>
       </Modal>
     </Paper>
   );

@@ -56,6 +56,15 @@ export interface PipelineEdge extends Edge {
   };
 }
 
+// Type for pipeline input/output
+export interface PipelineIO {
+  id: string;
+  name: string;
+  type: string;
+  value?: any;
+  description?: string;
+}
+
 // Type for pipeline
 export interface Pipeline {
   id: string;
@@ -64,6 +73,8 @@ export interface Pipeline {
   nodes: PipelineNode[];
   edges: PipelineEdge[];
   globalVariables?: Record<string, any>;
+  inputs?: PipelineIO[];
+  outputs?: PipelineIO[];
 }
 
 // Type for pipeline editor state

@@ -168,7 +168,7 @@ const NodeDetails: React.FC<NodeDetailsProps> = ({ node }) => {
                     secondary={
                       <>
                         <Typography component="span" variant="body2" color="text.primary">
-                          {input.value || '(Not set)'}
+                          {input.connected ? '(Connected to output)' : (input.value || '(Not set)')}
                         </Typography>
                         <br />
                         <Typography component="span" variant="caption">
