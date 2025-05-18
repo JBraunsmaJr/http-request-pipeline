@@ -35,7 +35,7 @@ interface PipelineContextType {
   edges: PipelineEdge[];
   onNodesChange: any;
   onEdgesChange: any;
-  addNode: (endpoint: ApiEndpoint) => void;
+  addNode: (endpoint: ApiEndpoint, position?: { x: number, y: number }) => void;
   updateNode: (nodeId: string, data: Partial<PipelineNode['data']>) => void;
   removeNode: (nodeId: string) => void;
   addEdge: (sourceId: string, targetId: string, sourceOutput?: string, targetInput?: string) => void;
@@ -113,11 +113,11 @@ export const PipelineProvider: React.FC<PipelineProviderProps> = ({ children }) 
   };
 
   // Node management
-  const addNode = (endpoint: ApiEndpoint) => {
+  const addNode = (endpoint: ApiEndpoint, position?: { x: number, y: number }) => {
     const newNode: PipelineNode = {
       id: uuidv4(),
       type: 'apiNode',
-      position: { x: 100, y: 100 },
+      position: position || { x: 100, y: 100 },
       data: {
         label: `${endpoint.method.toUpperCase()} ${endpoint.path}`,
         endpoint,

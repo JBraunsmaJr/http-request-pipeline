@@ -21,9 +21,17 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField
+  TextField,
+  IconButton,
+  Fab,
+  Tooltip
 } from '@mui/material';
-import { Save as SaveIcon, Refresh as LoadIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
+import { 
+  Save as SaveIcon, 
+  Refresh as LoadIcon, 
+  Visibility as VisibilityIcon,
+  Menu as MenuIcon
+} from '@mui/icons-material';
 import { usePipeline } from '../../contexts/PipelineContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import ApiNode from './ApiNode';
@@ -32,6 +40,7 @@ import OutputNode from './OutputNode';
 import NodeDetails from './NodeDetails';
 import PipelineIO from './PipelineIO';
 import ArazzoViewer from './ArazzoViewer';
+import EndpointDrawer from './EndpointDrawer';
 
 // Define node types
 const nodeTypes = {
@@ -53,6 +62,7 @@ const PipelineEditorContent = () => {
     loadPipeline,
     pipeline,
     addInputNode,
+    addNode,
     addOutputNode
   } = usePipeline();
   const { darkMode } = useTheme();
@@ -67,6 +77,9 @@ const PipelineEditorContent = () => {
 
   // State for Arazzo viewer
   const [arazzoViewerOpen, setArazzoViewerOpen] = useState(false);
+
+  // State for endpoint drawer
+  const [endpointDrawerOpen, setEndpointDrawerOpen] = useState(true);
 
   // Handle connections between nodes
   const onConnect = useCallback(
@@ -87,7 +100,7 @@ const PipelineEditorContent = () => {
     setSelectedNode(null);
   }, [setSelectedNode]);
 
-  // Handle drop event for pipeline inputs/outputs
+  // Handle drop event for pipeline inputs/outputs and endpoints
   const onDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
 
@@ -105,8 +118,19 @@ const PipelineEditorContent = () => {
       addInputNode(id, position);
     } else if (type === 'pipelineOutput') {
       addOutputNode(id, position);
+    } else if (type === 'endpoint') {
+      // Handle endpoint drop
+      const endpointData = event.dataTransfer.getData('application/reactflow/endpoint');
+      if (endpointData) {
+        try {
+          const endpoint = JSON.parse(endpointData);
+          addNode(endpoint, position);
+        } catch (error) {
+          console.error('Failed to parse endpoint data:', error);
+        }
+      }
     }
-  }, [addInputNode, addOutputNode, reactFlowInstance]);
+  }, [addInputNode, addOutputNode, addNode, reactFlowInstance]);
 
   // Handle drag over event
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
@@ -173,10 +197,22 @@ const PipelineEditorContent = () => {
     setArazzoViewerOpen(false);
   };
 
+  // Toggle endpoint drawer
+  const toggleEndpointDrawer = () => {
+    setEndpointDrawerOpen(prev => !prev);
+  };
+
   return (
     <Box sx={{ height: 'calc(100vh - 120px)', display: 'flex' }}>
+      {/* Endpoint Drawer */}
+      <EndpointDrawer open={endpointDrawerOpen} onToggle={toggleEndpointDrawer} />
+
       {/* Main Flow Editor */}
-      <Box sx={{ flexGrow: 1, height: '100%', position: 'relative' }}>
+      <Box sx={{ 
+        flexGrow: 1, 
+        height: '100%', 
+        position: 'relative'
+      }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -222,6 +258,14 @@ const PipelineEditorContent = () => {
                 Nodes: {nodes.length} | Connections: {edges.length}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1 }}>
+                <IconButton
+                  size="small"
+                  onClick={toggleEndpointDrawer}
+                  sx={{ mr: 1 }}
+                  title={endpointDrawerOpen ? "Hide Endpoints" : "Show Endpoints"}
+                >
+                  <MenuIcon />
+                </IconButton>
                 <Button
                   variant="outlined"
                   size="small"
@@ -315,6 +359,25 @@ const PipelineEditorContent = () => {
         open={arazzoViewerOpen} 
         onClose={handleCloseArazzoViewer} 
       />
+
+      {/* Floating Action Button for Endpoint Drawer */}
+      {!endpointDrawerOpen && (
+        <Tooltip title="Show API Endpoints">
+          <Fab
+            color="primary"
+            size="medium"
+            onClick={toggleEndpointDrawer}
+            sx={{
+              position: 'absolute',
+              left: 20,
+              top: 180,
+              zIndex: 1000
+            }}
+          >
+            <MenuIcon />
+          </Fab>
+        </Tooltip>
+      )}
     </Box>
   );
 };
