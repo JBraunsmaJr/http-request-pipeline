@@ -6,7 +6,8 @@ import ReactFlow, {
   Panel,
   ReactFlowProvider,
   ConnectionLineType,
-  type Connection
+  type Connection,
+  useReactFlow
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { 
@@ -22,7 +23,7 @@ import {
   DialogActions,
   TextField
 } from '@mui/material';
-import { Save as SaveIcon, Refresh as LoadIcon } from '@mui/icons-material';
+import { Save as SaveIcon, Refresh as LoadIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
 import { usePipeline } from '../../contexts/PipelineContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import ApiNode from './ApiNode';
@@ -30,6 +31,7 @@ import InputNode from './InputNode';
 import OutputNode from './OutputNode';
 import NodeDetails from './NodeDetails';
 import PipelineIO from './PipelineIO';
+import ArazzoViewer from './ArazzoViewer';
 
 // Define node types
 const nodeTypes = {
@@ -38,7 +40,7 @@ const nodeTypes = {
   outputNode: OutputNode
 };
 
-const PipelineEditor: React.FC = () => {
+const PipelineEditorContent = () => {
   const { 
     nodes, 
     edges, 
@@ -54,6 +56,7 @@ const PipelineEditor: React.FC = () => {
     addOutputNode
   } = usePipeline();
   const { darkMode } = useTheme();
+  const reactFlowInstance = useReactFlow();
 
   // State for save/load UI
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -61,6 +64,9 @@ const PipelineEditor: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+
+  // State for Arazzo viewer
+  const [arazzoViewerOpen, setArazzoViewerOpen] = useState(false);
 
   // Handle connections between nodes
   const onConnect = useCallback(
@@ -90,17 +96,17 @@ const PipelineEditor: React.FC = () => {
     const id = event.dataTransfer.getData('application/reactflow/id');
 
     // Get the position where the element was dropped
-    const position = {
+    const position = reactFlowInstance.screenToFlowPosition({
       x: event.clientX - reactFlowBounds.left,
       y: event.clientY - reactFlowBounds.top
-    };
+    });
 
     if (type === 'pipelineInput') {
       addInputNode(id, position);
     } else if (type === 'pipelineOutput') {
       addOutputNode(id, position);
     }
-  }, [addInputNode, addOutputNode]);
+  }, [addInputNode, addOutputNode, reactFlowInstance]);
 
   // Handle drag over event
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
@@ -158,77 +164,92 @@ const PipelineEditor: React.FC = () => {
     setSnackbarOpen(false);
   };
 
+  // Handle Arazzo viewer open/close
+  const handleOpenArazzoViewer = () => {
+    setArazzoViewerOpen(true);
+  };
+
+  const handleCloseArazzoViewer = () => {
+    setArazzoViewerOpen(false);
+  };
+
   return (
     <Box sx={{ height: 'calc(100vh - 120px)', display: 'flex' }}>
       {/* Main Flow Editor */}
       <Box sx={{ flexGrow: 1, height: '100%', position: 'relative' }}>
-        <ReactFlowProvider>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onPaneClick={onPaneClick}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-            nodeTypes={nodeTypes}
-            connectionLineType={ConnectionLineType.Bezier}
-            defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-            fitView
-            attributionPosition="bottom-right"
-            style={{
-              backgroundColor: darkMode ? '#121212' : '#f5f5f5'
-            }}
-          >
-            <Background 
-              color={darkMode ? '#333' : '#aaa'} 
-              gap={16} 
-              size={1} 
-            />
-            <Controls />
-            <MiniMap
-              nodeStrokeColor={darkMode ? '#555' : '#ddd'}
-              nodeColor={darkMode ? '#222' : '#fff'}
-              nodeBorderRadius={2}
-              maskColor={darkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
-            />
-            <Panel position="top-right">
-              <Paper 
-                sx={{ 
-                  p: 1, 
-                  backgroundColor: darkMode ? '#1e1e1e' : '#fff',
-                  boxShadow: 3,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 1
-                }}
-              >
-                <Typography variant="body2">
-                  Nodes: {nodes.length} | Connections: {edges.length}
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<SaveIcon />}
-                    onClick={handleOpenSaveDialog}
-                  >
-                    Save
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<LoadIcon />}
-                    onClick={handleLoadPipeline}
-                  >
-                    Load
-                  </Button>
-                </Box>
-              </Paper>
-            </Panel>
-          </ReactFlow>
-        </ReactFlowProvider>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onPaneClick={onPaneClick}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          nodeTypes={nodeTypes}
+          connectionLineType={ConnectionLineType.Bezier}
+          defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+          fitView
+          attributionPosition="bottom-right"
+          style={{
+            backgroundColor: darkMode ? '#121212' : '#f5f5f5'
+          }}
+        >
+          <Background 
+            color={darkMode ? '#333' : '#aaa'} 
+            gap={16} 
+            size={1} 
+          />
+          <Controls />
+          <MiniMap
+            nodeStrokeColor={darkMode ? '#555' : '#ddd'}
+            nodeColor={darkMode ? '#222' : '#fff'}
+            nodeBorderRadius={2}
+            maskColor={darkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+          />
+          <Panel position="top-right">
+            <Paper 
+              sx={{ 
+                p: 1, 
+                backgroundColor: darkMode ? '#1e1e1e' : '#fff',
+                boxShadow: 3,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1
+              }}
+            >
+              <Typography variant="body2">
+                Nodes: {nodes.length} | Connections: {edges.length}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<SaveIcon />}
+                  onClick={handleOpenSaveDialog}
+                >
+                  Save
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<LoadIcon />}
+                  onClick={handleLoadPipeline}
+                >
+                  Load
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<VisibilityIcon />}
+                  onClick={handleOpenArazzoViewer}
+                >
+                  Arazzo
+                </Button>
+              </Box>
+            </Paper>
+          </Panel>
+        </ReactFlow>
       </Box>
 
       {/* Node Details Panel or Pipeline IO Panel */}
@@ -288,7 +309,21 @@ const PipelineEditor: React.FC = () => {
           {snackbarMessage}
         </Alert>
       </Snackbar>
+
+      {/* Arazzo Viewer */}
+      <ArazzoViewer 
+        open={arazzoViewerOpen} 
+        onClose={handleCloseArazzoViewer} 
+      />
     </Box>
+  );
+};
+
+const PipelineEditor: React.FC = () => {
+  return (
+    <ReactFlowProvider>
+      <PipelineEditorContent />
+    </ReactFlowProvider>
   );
 };
 
