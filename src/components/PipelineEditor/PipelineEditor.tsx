@@ -87,6 +87,8 @@ const PipelineEditorContent = () => {
       // Extract source and target information
       const { source, target, sourceHandle, targetHandle } = connection;
 
+      console.log('Connection:', { source, target, sourceHandle, targetHandle });
+
       if (source && target && sourceHandle && targetHandle) {
         // Add edge to the pipeline
         addPipelineEdge(source, target, sourceHandle, targetHandle);
@@ -230,6 +232,8 @@ const PipelineEditorContent = () => {
           style={{
             backgroundColor: darkMode ? '#121212' : '#f5f5f5'
           }}
+          connectionMode="strict"
+          connectOnClick={false}
         >
           <Background 
             color={darkMode ? '#333' : '#aaa'} 

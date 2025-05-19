@@ -325,11 +325,18 @@ export const PipelineProvider: React.FC<PipelineProviderProps> = ({ children }) 
 
   // Edge management
   const addEdge = (sourceId: string, targetId: string, sourceOutput?: string, targetInput?: string) => {
+
     // Find source and target nodes
     const sourceNode = nodes.find(node => node.id === sourceId);
     const targetNode = nodes.find(node => node.id === targetId);
 
     if (!sourceNode || !targetNode || !sourceOutput || !targetInput) {
+      console.log('Missing required parameters:', { 
+        sourceNodeExists: !!sourceNode, 
+        targetNodeExists: !!targetNode, 
+        sourceOutputExists: !!sourceOutput, 
+        targetInputExists: !!targetInput 
+      });
       return;
     }
 
@@ -353,6 +360,10 @@ export const PipelineProvider: React.FC<PipelineProviderProps> = ({ children }) 
     const targetInputItem = targetNode.data.inputs.find(input => input.id === targetInput);
 
     if (!sourceOutputItem || !targetInputItem) {
+      console.log('Could not find matching source output or target input:', {
+        sourceOutputFound: !!sourceOutputItem,
+        targetInputFound: !!targetInputItem
+      });
       return;
     }
 
@@ -374,10 +385,8 @@ export const PipelineProvider: React.FC<PipelineProviderProps> = ({ children }) 
       id: uuidv4(),
       source: sourceId,
       target: targetId,
-      data: {
-        sourceOutput,
-        targetInput
-      }
+      sourceHandle: sourceOutput,
+      targetHandle: targetInput,
     };
 
     // Add the edge
