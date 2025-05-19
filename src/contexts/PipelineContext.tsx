@@ -385,6 +385,7 @@ export const PipelineProvider: React.FC<PipelineProviderProps> = ({ children }) 
       id: uuidv4(),
       source: sourceId,
       target: targetId,
+      type: "smoothstep",
       sourceHandle: sourceOutput,
       targetHandle: targetInput,
     };
